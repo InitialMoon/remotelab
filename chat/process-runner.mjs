@@ -120,6 +120,7 @@ export function spawnTool(toolId, folder, prompt, onEvent, onExit, options = {})
     adapter = createCodexAdapter();
     args = buildCodexArgs(effectivePrompt, {
       threadId: options.codexThreadId,
+      codexAutomationMode: options.codexAutomationMode,
     });
   } else {
     adapter = createClaudeAdapter();
@@ -243,6 +244,7 @@ export function spawnTool(toolId, folder, prompt, onEvent, onExit, options = {})
 
         const continueArgs = buildCodexArgs('Continue. Complete all remaining work now.', {
           threadId: state.capturedCodexThreadId,
+          codexAutomationMode: options.codexAutomationMode,
         });
         spawnProcess(continueArgs);
         return;

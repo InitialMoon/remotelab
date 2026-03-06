@@ -14,6 +14,8 @@
   const folderInput = document.getElementById("folderInput");
   const folderSuggestions = document.getElementById("folderSuggestions");
   const toolSelect = document.getElementById("toolSelect");
+  const codexModeRow = document.getElementById("codexModeRow");
+  const codexModeSelect = document.getElementById("codexModeSelect");
   const cancelModal = document.getElementById("cancelModal");
   const createSessionBtn = document.getElementById("createSession");
   const messagesEl = document.getElementById("messages");
@@ -668,8 +670,30 @@
           folderSuggestions.innerHTML = "";
           return;
         }
+        if (tool === "codex") {
+          if (!isDesktop) closeSidebarFn();
+          newSessionModal.classList.add("open");
+          folderInput.value = folder;
+          folderSuggestions.innerHTML = "";
+          if (codexModeSelect) {
+            codexModeSelect.value =
+              localStorage.getItem("codexAutomationMode") || "danger-full-access";
+          }
+          loadTools().then(() => {
+            if (toolSelect) {
+              toolSelect.value = "codex";
+            }
+            updateCodexModeVisibility();
+          });
+          return;
+        }
         if (!isDesktop) closeSidebarFn();
-        wsSend({ action: "create", folder, tool });
+        const payload = { action: "create", folder, tool };
+        if (tool === "codex") {
+          payload.codexAutomationMode =
+            localStorage.getItem("codexAutomationMode") || "danger-full-access";
+        }
+        wsSend(payload);
         const handler = (evt) => {
           let msg;
           try { msg = JSON.parse(evt.data); } catch { return; }
@@ -691,15 +715,16 @@
           "session-item" + (s.id === currentSessionId ? " active" : "");
 
         const displayName = s.name || s.tool || "session";
-        const metaParts = [];
-        if (s.name && s.tool) metaParts.push(s.tool);
-        if (s.status === "running") metaParts.push("●&nbsp;running");
+        const codexModeTag =
+          s.tool === "codex" && s.codexAutomationMode
+            ? ` · ${esc(s.codexAutomationMode)}`
+            : "";
         const metaHtml = finishedUnread.has(s.id)
           ? `<span class="status-done">● done</span>`
           : s.status === "running"
             ? `<span class="status-running">● running</span>`
             : s.tool && s.name
-              ? `<span>${esc(s.tool)}</span>`
+              ? `<span>${esc(s.tool)}${codexModeTag}</span>`
               : "";
 
         div.innerHTML = `
@@ -819,12 +844,26 @@
   });
 
   // ---- New Session Modal ----
+  function updateCodexModeVisibility() {
+    if (!codexModeRow || !codexModeSelect) return;
+    const isCodex = toolSelect.value === "codex";
+    codexModeRow.style.display = isCodex ? "" : "none";
+  }
+
+  if (toolSelect) {
+    toolSelect.addEventListener("change", updateCodexModeVisibility);
+  }
+
   newSessionBtn.addEventListener("click", () => {
     if (!isDesktop) closeSidebarFn();
     newSessionModal.classList.add("open");
     loadTools();
     folderInput.value = "";
     folderSuggestions.innerHTML = "";
+    if (codexModeSelect) {
+      codexModeSelect.value =
+        localStorage.getItem("codexAutomationMode") || "danger-full-access";
+    }
     folderInput.focus();
   });
 
@@ -842,7 +881,12 @@
       folderInput.focus();
       return;
     }
-    wsSend({ action: "create", folder, tool });
+    const payload = { action: "create", folder, tool };
+    if (tool === "codex" && codexModeSelect) {
+      payload.codexAutomationMode = codexModeSelect.value;
+      localStorage.setItem("codexAutomationMode", codexModeSelect.value);
+    }
+    wsSend(payload);
     newSessionModal.classList.remove("open");
 
     const handler = (e) => {
@@ -873,6 +917,7 @@
         opt.textContent = t.name;
         toolSelect.appendChild(opt);
       }
+      updateCodexModeVisibility();
     } catch {}
   }
 

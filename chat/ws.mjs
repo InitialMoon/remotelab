@@ -5,6 +5,7 @@ import {
   subscribe, unsubscribe, sendMessage, cancelSession, getHistory,
   renameSession, compactSession,
 } from './session-manager.mjs';
+import { CODEX_AUTOMATION_MODES } from './codex-automation.mjs';
 
 /**
  * Attach WebSocket handling to an HTTP server.
@@ -88,7 +89,20 @@ function handleMessage(ws, msg, ctx) {
         wsSend(ws, { type: 'error', message: 'folder and tool are required' });
         return;
       }
-      const session = createSession(msg.folder, msg.tool, msg.name || '');
+      if (
+        msg.tool === 'codex' &&
+        msg.codexAutomationMode &&
+        !CODEX_AUTOMATION_MODES.includes(msg.codexAutomationMode)
+      ) {
+        wsSend(ws, {
+          type: 'error',
+          message: `codexAutomationMode must be one of: ${CODEX_AUTOMATION_MODES.join(', ')}`,
+        });
+        return;
+      }
+      const session = createSession(msg.folder, msg.tool, msg.name || '', {
+        codexAutomationMode: msg.codexAutomationMode,
+      });
       wsSend(ws, { type: 'session', session });
       break;
     }

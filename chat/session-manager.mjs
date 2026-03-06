@@ -7,6 +7,10 @@ import { loadHistory, appendEvent } from './history.mjs';
 import { messageEvent, statusEvent } from './normalizer.mjs';
 import { triggerSummary, removeSidebarEntry } from './summarizer.mjs';
 import { sendCompletionPush } from './push.mjs';
+import {
+  DEFAULT_CODEX_AUTOMATION_MODE,
+  normalizeCodexAutomationMode,
+} from './codex-automation.mjs';
 
 const MIME_EXT = { 'image/png': '.png', 'image/jpeg': '.jpg', 'image/gif': '.gif', 'image/webp': '.webp' };
 
@@ -31,6 +35,31 @@ const liveSessions = new Map();
 
 function generateId() {
   return randomBytes(16).toString('hex');
+}
+
+function codexModeLabel(mode) {
+  switch (mode) {
+    case 'read-only':
+      return 'read-only';
+    case 'workspace-write':
+      return 'workspace-write';
+    case 'danger-full-access':
+    default:
+      return 'full-access';
+  }
+}
+
+function ensureUniqueName(existing, folder, desiredName) {
+  const peers = existing.filter(s => s.folder === folder);
+  const names = new Set(peers.map(s => (s.name || '').trim()).filter(Boolean));
+
+  if (!names.has(desiredName)) return desiredName;
+
+  let n = 2;
+  while (names.has(`${desiredName} #${n}`)) {
+    n++;
+  }
+  return `${desiredName} #${n}`;
 }
 
 // ---- Persistence ----
@@ -73,17 +102,28 @@ export function getSession(id) {
   };
 }
 
-export function createSession(folder, tool, name = 'new session') {
+export function createSession(folder, tool, name = 'new session', options = {}) {
   const id = generateId();
+  const codexAutomationMode = tool === 'codex'
+    ? normalizeCodexAutomationMode(options.codexAutomationMode)
+    : null;
+  const metas = loadSessionsMeta();
+  const requestedName = (name || '').trim();
+  const baseName = requestedName || (
+    tool === 'codex'
+      ? `codex (${codexModeLabel(codexAutomationMode)})`
+      : tool || 'session'
+  );
+  const uniqueName = ensureUniqueName(metas, folder, baseName);
   const session = {
     id,
     folder,
     tool,
-    name: name || 'new session',
+    name: uniqueName,
     created: new Date().toISOString(),
+    codexAutomationMode,
   };
 
-  const metas = loadSessionsMeta();
   metas.push(session);
   saveSessionsMeta(metas);
 
@@ -250,6 +290,11 @@ export function sendMessage(sessionId, text, images, options = {}) {
     spawnOptions.codexThreadId = live.codexThreadId;
     console.log(`[session-mgr] Will resume Codex thread: ${live.codexThreadId}`);
   }
+  if (effectiveTool === 'codex') {
+    spawnOptions.codexAutomationMode = normalizeCodexAutomationMode(
+      options.codexAutomationMode || session.codexAutomationMode || DEFAULT_CODEX_AUTOMATION_MODE,
+    );
+  }
 
   if (savedImages.length > 0) {
     spawnOptions.images = savedImages;
@@ -265,7 +310,10 @@ export function sendMessage(sessionId, text, images, options = {}) {
     live.compactContext = undefined;
   }
 
-  console.log(`[session-mgr] Spawning tool=${effectiveTool} folder=${session.folder} thinking=${!!options.thinking}`);
+  console.log(
+    `[session-mgr] Spawning tool=${effectiveTool} folder=${session.folder} ` +
+    `thinking=${!!options.thinking} codexMode=${spawnOptions.codexAutomationMode || 'n/a'}`,
+  );
   const runner = spawnTool(effectiveTool, session.folder, actualText, onEvent, onExit, spawnOptions);
   live.runner = runner;
 }

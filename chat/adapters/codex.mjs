@@ -2,6 +2,11 @@ import {
   messageEvent, toolUseEvent, toolResultEvent,
   fileChangeEvent, reasoningEvent, statusEvent, usageEvent,
 } from '../normalizer.mjs';
+import {
+  buildCodexAutomationArgs,
+  DEFAULT_CODEX_AUTOMATION_MODE,
+  normalizeCodexAutomationMode,
+} from '../codex-automation.mjs';
 
 /**
  * Codex CLI adapter.
@@ -186,7 +191,10 @@ export function buildCodexArgs(prompt, options = {}) {
   const args = ['exec'];
 
   args.push('--json');
-  args.push('--dangerously-bypass-approvals-and-sandbox');
+  const codexAutomationMode = normalizeCodexAutomationMode(
+    options.codexAutomationMode || DEFAULT_CODEX_AUTOMATION_MODE,
+  );
+  args.push(...buildCodexAutomationArgs(codexAutomationMode));
 
   const effectivePrompt = CODEX_SYSTEM_PREFIX + prompt;
 

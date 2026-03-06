@@ -13,6 +13,7 @@ import { listSessions, getSession, createSession, deleteSession } from './sessio
 import { getSidebarState } from './summarizer.mjs';
 import { getPublicKey, addSubscription } from './push.mjs';
 import { readBody } from '../lib/utils.mjs';
+import { CODEX_AUTOMATION_MODES } from './codex-automation.mjs';
 import {
   getClientIp, isRateLimited, recordFailedAttempt, clearFailedAttempts,
   setSecurityHeaders, generateNonce, requireAuth,
@@ -162,10 +163,15 @@ export async function handleRequest(req, res) {
       throw err;
     }
     try {
-      const { folder, tool } = JSON.parse(body);
+      const { folder, tool, name, codexAutomationMode } = JSON.parse(body);
       if (!folder || !tool) {
         res.writeHead(400, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: 'folder and tool are required' }));
+        return;
+      }
+      if (tool === 'codex' && codexAutomationMode && !CODEX_AUTOMATION_MODES.includes(codexAutomationMode)) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: `codexAutomationMode must be one of: ${CODEX_AUTOMATION_MODES.join(', ')}` }));
         return;
       }
       const resolvedFolder = folder.startsWith('~')
@@ -176,7 +182,7 @@ export async function handleRequest(req, res) {
         res.end(JSON.stringify({ error: 'Folder does not exist' }));
         return;
       }
-      const session = createSession(resolvedFolder, tool);
+      const session = createSession(resolvedFolder, tool, name, { codexAutomationMode });
       res.writeHead(201, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ session }));
     } catch {

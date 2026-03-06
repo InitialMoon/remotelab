@@ -716,6 +716,14 @@ body {
     <div class="ac-suggestions" id="folderSuggestions"></div>
     <label>Tool</label>
     <select id="toolSelect"></select>
+    <div id="codexModeRow" style="display:none">
+      <label>Codex Automation</label>
+      <select id="codexModeSelect">
+        <option value="workspace-write">Workspace Write (sandboxed)</option>
+        <option value="danger-full-access">Danger Full Access (no sandbox)</option>
+        <option value="read-only">Read Only (no file writes)</option>
+      </select>
+    </div>
     <div class="modal-actions">
       <button class="btn-cancel" id="cancelModal">Cancel</button>
       <button class="btn-create" id="createSession">Create</button>

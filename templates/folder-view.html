@@ -239,6 +239,76 @@
       margin-left: 8px;
     }
 
+    .codex-mode-modal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.6);
+      align-items: center;
+      justify-content: center;
+      z-index: 2000;
+      padding: 20px;
+    }
+
+    .codex-mode-modal.open {
+      display: flex;
+    }
+
+    .codex-mode-card {
+      width: min(460px, 100%);
+      background: var(--bg-dark);
+      border: 1px solid var(--terminal-green);
+      box-shadow: 0 14px 32px rgba(0, 0, 0, 0.45);
+      padding: 18px;
+    }
+
+    .codex-mode-title {
+      color: var(--terminal-cyan);
+      font-size: 14px;
+      font-weight: 700;
+      margin-bottom: 10px;
+    }
+
+    .codex-mode-help {
+      color: rgba(0, 255, 65, 0.8);
+      font-size: 12px;
+      line-height: 1.5;
+      margin-bottom: 12px;
+    }
+
+    .codex-mode-select {
+      width: 100%;
+      background: var(--bg-black);
+      color: var(--terminal-green);
+      border: 1px solid rgba(0, 255, 65, 0.4);
+      padding: 10px 12px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      margin-bottom: 14px;
+    }
+
+    .codex-mode-actions {
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
+    }
+
+    .codex-mode-btn {
+      border: 1px solid var(--terminal-green);
+      background: transparent;
+      color: var(--terminal-green);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      text-transform: uppercase;
+      padding: 8px 14px;
+      cursor: pointer;
+    }
+
+    .codex-mode-btn.primary {
+      background: var(--terminal-green);
+      color: var(--bg-black);
+    }
+
     /* Main layout */
     .main-container {
       display: grid;
@@ -742,6 +812,24 @@
 
   <div id="drag-overlay" class="drag-overlay"></div>
 
+  <div id="codex-mode-modal" class="codex-mode-modal">
+    <div class="codex-mode-card">
+      <div class="codex-mode-title">Codex Automation Mode</div>
+      <div class="codex-mode-help">
+        Select how much command autonomy Codex gets for this new session.
+      </div>
+      <select id="codex-mode-select" class="codex-mode-select">
+        <option value="workspace-write">Workspace Write (sandboxed)</option>
+        <option value="danger-full-access">Danger Full Access (no sandbox)</option>
+        <option value="read-only">Read Only (no file writes)</option>
+      </select>
+      <div class="codex-mode-actions">
+        <button id="codex-mode-cancel" class="codex-mode-btn" type="button">Cancel</button>
+        <button id="codex-mode-create" class="codex-mode-btn primary" type="button">Create</button>
+      </div>
+    </div>
+  </div>
+
   <script nonce="{{NONCE}}">
     const FOLDER_PATH = '{{FOLDER_PATH_JS}}';
     const FOLDER_PATH_URL = '{{FOLDER_PATH_URL}}';
@@ -752,6 +840,7 @@
     let availableTools = [];
     let autoRefreshInterval = null;
     let currentDiffData = null;
+    let pendingCodexSession = null;
 
     function escapeHtml(str) {
       var div = document.createElement('div');
@@ -782,6 +871,9 @@
 
     function getBadgeLabel(session) {
       if (session.type === 'shell') return 'Shell';
+      if (session.tool === 'codex' && session.codexAutomationMode) {
+        return 'codex · ' + session.codexAutomationMode;
+      }
       return session.tool || 'claude';
     }
 
@@ -938,8 +1030,16 @@
       return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     }
 
-    async function createNewTab(toolId, toolName, isShell) {
-      var baseName = isShell ? 'Shell' : (toolName || toolId);
+    async function createNewTab(toolId, toolName, isShell, codexAutomationMode) {
+      var baseName;
+      if (isShell) {
+        baseName = 'Shell';
+      } else if (toolId === 'codex') {
+        var modeName = codexAutomationMode || localStorage.getItem('codexAutomationMode') || 'danger-full-access';
+        baseName = (toolName || toolId) + ' (' + modeName + ')';
+      } else {
+        baseName = toolName || toolId;
+      }
       var name = getNextName(baseName);
 
       var body = { name: name, folder: FOLDER_PATH };
@@ -947,6 +1047,9 @@
         body.type = 'shell';
       } else {
         body.tool = toolId;
+        if (toolId === 'codex') {
+          body.codexAutomationMode = codexAutomationMode || localStorage.getItem('codexAutomationMode') || 'danger-full-access';
+        }
       }
 
       try {
@@ -984,6 +1087,20 @@
       });
 
       dropdown.innerHTML = html;
+    }
+
+    function openCodexModeModal(toolId, toolName) {
+      var modal = document.getElementById('codex-mode-modal');
+      var select = document.getElementById('codex-mode-select');
+      pendingCodexSession = { toolId: toolId, toolName: toolName };
+      select.value = localStorage.getItem('codexAutomationMode') || 'danger-full-access';
+      modal.classList.add('open');
+      select.focus();
+    }
+
+    function closeCodexModeModal() {
+      document.getElementById('codex-mode-modal').classList.remove('open');
+      pendingCodexSession = null;
     }
 
     // ── Diff Panel (same as session-view.html) ──
@@ -1271,6 +1388,8 @@
 
         if (option.dataset.isShell === 'true') {
           createNewTab(null, null, true);
+        } else if (option.dataset.toolId === 'codex') {
+          openCodexModeModal(option.dataset.toolId, option.dataset.toolName);
         } else {
           createNewTab(option.dataset.toolId, option.dataset.toolName, false);
         }
@@ -1283,6 +1402,25 @@
       if (!e.target.closest('#new-tab-wrapper')) {
         document.getElementById('new-tab-dropdown').classList.remove('open');
       }
+    });
+
+    document.getElementById('codex-mode-cancel').addEventListener('click', function() {
+      closeCodexModeModal();
+    });
+
+    document.getElementById('codex-mode-modal').addEventListener('click', function(e) {
+      if (e.target.id === 'codex-mode-modal') {
+        closeCodexModeModal();
+      }
+    });
+
+    document.getElementById('codex-mode-create').addEventListener('click', function() {
+      if (!pendingCodexSession) return;
+      var mode = document.getElementById('codex-mode-select').value;
+      localStorage.setItem('codexAutomationMode', mode);
+      var pending = pendingCodexSession;
+      closeCodexModeModal();
+      createNewTab(pending.toolId, pending.toolName, false, mode);
     });
 
     // ── Terminal Helpers ──
