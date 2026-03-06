@@ -92,6 +92,10 @@ Phone ──HTTPS──→ Cloudflare Tunnel ──→ chat-server :7690
 
 Each chat session is a subprocess. When you disconnect, the process keeps running. When you reconnect, the server replays history and reattaches to the live stream.
 
+If the `chat-server` itself restarts during an active run, that subprocess is interrupted. RemoteLab now marks the session as `interrupted` and exposes a `Resume` action when Claude/Codex resume metadata was captured, so restart recovery is explicit instead of silently losing the turn.
+
+For self-hosting development, keep two chat-server planes active: use `7690` as the stable coding/operator plane and `7692` as the restartable validation plane. Avoid doing active coding work from `7692`; use it to verify changes, restart freely, and confirm behavior. Once `7692` is good, finish your current message on `7690` and only then restart/reload `7690` if needed. For custom-port dev instances, use `scripts/chat-instance.sh`.
+
 ---
 
 ## CLI Reference
@@ -121,9 +125,9 @@ remotelab --help               Show help
 
 | Path | Contents |
 |------|----------|
-| `~/.config/claude-web/auth.json` | Access token + password hash |
-| `~/.config/claude-web/chat-sessions.json` | Chat session metadata |
-| `~/.config/claude-web/chat-history/` | Per-session event logs (JSONL) |
+| `~/.config/remotelab/auth.json` | Access token + password hash |
+| `~/.config/remotelab/chat-sessions.json` | Chat session metadata |
+| `~/.config/remotelab/chat-history/` | Per-session event logs (JSONL) |
 | `~/Library/Logs/chat-server.log` | Chat server stdout **(macOS)** |
 | `~/.local/share/remotelab/logs/chat-server.log` | Chat server stdout **(Linux)** |
 | `~/Library/Logs/cloudflared.log` | Tunnel stdout **(macOS)** |
@@ -166,6 +170,13 @@ lsof -i :7681   # auth proxy
 remotelab restart chat
 remotelab restart proxy
 remotelab restart tunnel
+```
+
+**Manage a custom dev chat instance:**
+```bash
+scripts/chat-instance.sh restart --port 7692 --name test
+scripts/chat-instance.sh status --port 7692 --name test
+scripts/chat-instance.sh logs --port 7692 --name test
 ```
 
 ---

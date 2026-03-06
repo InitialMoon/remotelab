@@ -195,8 +195,16 @@ export function buildCodexArgs(prompt, options = {}) {
     options.codexAutomationMode || DEFAULT_CODEX_AUTOMATION_MODE,
   );
   args.push(...buildCodexAutomationArgs(codexAutomationMode));
+  args.push('--skip-git-repo-check');
 
-  const effectivePrompt = CODEX_SYSTEM_PREFIX + prompt;
+  if (options.model) {
+    args.push('-m', options.model);
+  }
+  if (options.reasoningEffort) {
+    args.push('-c', `model_reasoning_effort=${options.reasoningEffort}`);
+  }
+
+  const effectivePrompt = (options.systemPrefix ?? CODEX_SYSTEM_PREFIX) + prompt;
 
   if (options.threadId) {
     args.push('resume', options.threadId, effectivePrompt);
