@@ -1612,28 +1612,11 @@
         const tool = preferredTool || selectedTool || toolsList[0]?.id;
         if (!tool) {
           // No tool loaded yet — fallback to modal
-          if (!isDesktop) closeSidebarFn();
-          newSessionModal.classList.add("open");
-          loadTools();
-          folderInput.value = folder;
-          folderSuggestions.innerHTML = "";
+          openNewSessionModal(folder, "");
           return;
         }
         if (tool === "codex") {
-          if (!isDesktop) closeSidebarFn();
-          newSessionModal.classList.add("open");
-          folderInput.value = folder;
-          folderSuggestions.innerHTML = "";
-          if (codexModeSelect) {
-            codexModeSelect.value =
-              localStorage.getItem("codexAutomationMode") || "danger-full-access";
-          }
-          loadTools().then(() => {
-            if (toolSelect) {
-              toolSelect.value = "codex";
-            }
-            updateCodexModeVisibility();
-          });
+          openNewSessionModal(folder, "codex");
           return;
         }
         if (!isDesktop) closeSidebarFn();
@@ -1877,24 +1860,39 @@
     toolSelect.addEventListener("change", updateCodexModeVisibility);
   }
 
-  newSessionBtn.addEventListener("click", () => {
+  async function openNewSessionModal(folder = "", preferredToolId = "") {
     if (!isDesktop) closeSidebarFn();
-    newSessionModal.classList.add("open");
-    loadTools();
-    folderInput.value = "";
+    newSessionModal.hidden = false;
+    folderInput.value = folder;
     folderSuggestions.innerHTML = "";
+    createSessionBtn.disabled = true;
     if (codexModeSelect) {
       codexModeSelect.value =
-      localStorage.getItem("codexAutomationMode") || "danger-full-access";
+        localStorage.getItem("codexAutomationMode") || "danger-full-access";
     }
+    await loadTools();
+    if (preferredToolId && toolSelect) {
+      const hasOption = Array.from(toolSelect.options).some(
+        (opt) => opt.value === preferredToolId,
+      );
+      if (hasOption) {
+        toolSelect.value = preferredToolId;
+      }
+    }
+    updateCodexModeVisibility();
+    createSessionBtn.disabled = false;
     folderInput.focus();
+  }
+
+  newSessionBtn.addEventListener("click", () => {
+    openNewSessionModal("", preferredTool || selectedTool || "");
   });
 
   cancelModal.addEventListener("click", () =>
-    newSessionModal.classList.remove("open"),
+    newSessionModal.hidden = true,
   );
   newSessionModal.addEventListener("click", (e) => {
-    if (e.target === newSessionModal) newSessionModal.classList.remove("open");
+    if (e.target === newSessionModal) newSessionModal.hidden = true;
   });
 
   createSessionBtn.addEventListener("click", () => {
@@ -1904,13 +1902,16 @@
       folderInput.focus();
       return;
     }
+    if (!tool) {
+      return;
+    }
     const payload = { action: "create", folder, tool };
     if (tool === "codex" && codexModeSelect) {
       payload.codexAutomationMode = codexModeSelect.value;
       localStorage.setItem("codexAutomationMode", codexModeSelect.value);
     }
     wsSend(payload);
-    newSessionModal.classList.remove("open");
+    newSessionModal.hidden = true;
 
     const handler = (e) => {
       let msg;
@@ -1935,6 +1936,9 @@
         opt.value = t.id;
         opt.textContent = t.name;
         toolSelect.appendChild(opt);
+      }
+      if (!toolSelect.value && toolSelect.options.length > 0) {
+        toolSelect.value = toolSelect.options[0].value;
       }
       updateCodexModeVisibility();
     } catch {}

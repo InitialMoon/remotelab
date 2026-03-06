@@ -999,25 +999,33 @@ body.visitor-mode .header #menuBtn { display: none !important; }
 </div>
 
 <!-- New Session Modal -->
-<div class="modal-overlay" id="newSessionModal">
-  <div class="modal">
-    <h3>New Session</h3>
-    <label>Folder</label>
-    <input type="text" id="folderInput" placeholder="/path/to/project" autocomplete="off">
-    <div class="ac-suggestions" id="folderSuggestions"></div>
-    <label>Tool</label>
-    <select id="toolSelect"></select>
-    <div id="codexModeRow" style="display:none">
-      <label>Codex Automation</label>
-      <select id="codexModeSelect">
-        <option value="workspace-write">Workspace Write (sandboxed)</option>
-        <option value="danger-full-access">Danger Full Access (no sandbox)</option>
-        <option value="read-only">Read Only (no file writes)</option>
-      </select>
+<div class="modal-backdrop" id="newSessionModal" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="newSessionModalTitle">
+    <div class="modal-header">
+      <div class="modal-title" id="newSessionModalTitle">New Session</div>
     </div>
-    <div class="modal-actions">
-      <button class="btn-cancel" id="cancelModal">Cancel</button>
-      <button class="btn-create" id="createSession">Create</button>
+    <div class="modal-body">
+      <div class="provider-helper-field">
+        <label for="folderInput">Folder</label>
+        <input type="text" id="folderInput" placeholder="/path/to/project" autocomplete="off">
+        <div class="ac-suggestions" id="folderSuggestions"></div>
+      </div>
+      <div class="provider-helper-field">
+        <label for="toolSelect">Tool</label>
+        <select id="toolSelect"></select>
+      </div>
+      <div class="provider-helper-field" id="codexModeRow" style="display:none">
+        <label for="codexModeSelect">Codex Automation</label>
+        <select id="codexModeSelect">
+          <option value="workspace-write">Workspace Write (sandboxed)</option>
+          <option value="danger-full-access">Danger Full Access (no sandbox)</option>
+          <option value="read-only">Read Only (no file writes)</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="modal-btn" id="cancelModal" type="button">Cancel</button>
+      <button class="modal-btn primary" id="createSession" type="button">Create</button>
     </div>
   </div>
 </div>
